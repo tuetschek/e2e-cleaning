@@ -1,5 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -"- encoding: utf-8 -"-
+# the script is Python2/3 compatible
 
 from __future__ import print_function
 from __future__ import unicode_literals
