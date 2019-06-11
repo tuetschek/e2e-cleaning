@@ -23,40 +23,44 @@ def main(args):
     print("Checking devel set...")
 
     # check devel data:
-    dev_idx_to_del = []
-    dev_mrs = set()
+    devel_idx_to_del = []
+    devel_mrs = set()
+    avoid = test_mrs | test_orig_mrs
     for idx, inst in devel.iterrows():
         mr = parse_mr(inst.mr)
-        dev_mrs.add(mr)
-        if mr in (test_mrs | test_orig_mrs):
-            dev_idx_to_del.append(idx)
+        devel_mrs.add(mr)
+        if mr in avoid:
+            devel_idx_to_del.append(idx)
 
     print("To delete: %d / %d instances from devel, %d / %d distinct MRs" %
-          (len(dev_idx_to_del), len(devel), len(dev_mrs & (test_mrs | test_orig_mrs)), len(dev_mrs)))
-    devel = devel.drop(dev_idx_to_del)
+          (len(devel_idx_to_del), len(devel), len(devel_mrs & avoid), len(devel_mrs)))
+    devel = devel.drop(devel_idx_to_del)
 
     output_devel = re.sub('(\.[^.]+)$', args.suffix + r'\1', args.input_devel)
     print("Writing fixed %s..." % output_devel)
     devel.to_csv(output_devel, encoding='UTF-8', index=False)
+    print("%d instances, %d distinct (delexicalized) MRs." % (len(devel), len(devel_mrs - avoid)))
 
     print("Checking train set...")
 
     # check train data
     train_idx_to_del = []
     train_mrs = set()
+    avoid = devel_mrs | test_mrs | test_orig_mrs
     for idx, inst in train.iterrows():
         mr = parse_mr(inst.mr)
         train_mrs.add(mr)
-        if mr in (dev_mrs | test_mrs | test_orig_mrs):
+        if mr in avoid:
             train_idx_to_del.append(idx)
 
     print("To delete: %d / %d instances from devel, %d / %d distinct MRs" %
-          (len(train_idx_to_del), len(train), len(train_mrs & (dev_mrs | test_mrs | test_orig_mrs)), len(train_mrs)))
+          (len(train_idx_to_del), len(train), len(train_mrs & avoid), len(train_mrs)))
     train = train.drop(train_idx_to_del)
 
     output_train = re.sub('(\.[^.]+)$', args.suffix + r'\1', args.input_train)
     print("Writing fixed %s..." % output_train)
     train.to_csv(output_train, encoding='UTF-8', index=False)
+    print("%d instances, %d distinct (delexicalized) MRs." % (len(train), len(train_mrs - avoid)))
 
 
 
