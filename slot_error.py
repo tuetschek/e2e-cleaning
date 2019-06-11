@@ -428,7 +428,7 @@ def process_file(filename, dump=None, fix=None, out=sys.stdout):
 
 
 if __name__ == '__main__':
-    ap = ArgumentParser(description='Estimate semantic/slot error rate on E2E system outputs')
+    ap = ArgumentParser(description='Compute semantic error/fix annotation for E2E dataset')
     ap.add_argument('--dump', '-d', type=str, help='Dump detailed output into a TSV file (one input only)')
     ap.add_argument('--fix', '-f', type=str, help='Output a fixed CSV file (one input only)')
     ap.add_argument('input_files', nargs='+', type=str, help='Input TSV file(s)')
