@@ -190,19 +190,19 @@ REALIZATIONS = {
             "(?:5|five)[- ]+stars?",
             "(?:5|five)(?: out)? of (?:5|five)",
             "(?:rat(?:ings?|e[ds]?)|reviews?|standards?|quality)(?: \w+){0,2} (?:as )?high",
-            "(?:high|excellent|very good|great)(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
+            "(?:high|excellent|very good|great|well)(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
         ],
         "average": [
             "(?:3|three)[- ]+stars?",
             "(?:3|three)(?: out)? of (?:5|five)",
             "(?:rat(?:ings?|e[ds]?)|reviews?|standards?|quality)(?: \w+){0,2} (?:as )?average",
-            "average(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
+            "(?:average|(?<!very )(?:good|well))(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
         ],
         "low": [
             "(?:1|one)[- ]+stars?",
             "(?:1|one)(?: out)? of (?:5|five)",
             "(?:rat(?:ings?|e[ds]?)|reviews?|standards?|quality)(?: \w+){0,2} (?:as )?(?:low|bad|poor)",
-            "(?:low|bad|poor)(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
+            "(?:low|bad|poor|does ?n['o]t have good|(?:is)?n['o]t (?:well|good))(?:ly)?(?:[ -]+\w+){0,2}[ -]+(?:rat(?:ings?|ed)|reviews?|standards?|quality)",
         ],
     },
 }
@@ -216,12 +216,15 @@ def compile_patterns(patterns):
                                 for pat in patterns]),
                       re.I | re.UNICODE)
 
-
+# store "proper" capitalization of the values
+CAPITALIZE = {}
 # compile realization patterns
 for slot in REALIZATIONS.keys():
     if isinstance(REALIZATIONS[slot], list):
+        CAPITALIZE[slot] = {val.lower(): val for val in REALIZATIONS[slot]}
         REALIZATIONS[slot] = compile_patterns(REALIZATIONS[slot])
     else:
+        CAPITALIZE[slot] = {val.lower(): val for val in REALIZATIONS[slot].keys()}
         for value in REALIZATIONS[slot].keys():
             REALIZATIONS[slot][value] = compile_patterns(REALIZATIONS[slot][value])
 
@@ -252,10 +255,12 @@ class Match(object):
         return str(self)
 
 
-def check_output(mr, ref):
-    """Check conformity of the given system output (ref) with the input MR."""
+def reclassify_mr(ref, gold_mr=DA()):
+    """Classify the MR given a text. Can use a gold-standard MR to make the classification more
+    precise (in case of ambiguity, goes with the gold-standard value). Returns a dict-based MR format
+    for the system output MR and the gold-standard MR."""
     # convert MR to dict for comparing & checking against
-    mr_dict = {dai.slot: {dai.value.lower(): 1} for dai in mr.dais}
+    mr_dict = {dai.slot: {CAPITALIZE[dai.slot][dai.value.lower()]: 1} for dai in gold_mr.dais}
 
     # create MR dict representation of the output text
     # first, collect all value matches
@@ -263,13 +268,13 @@ def check_output(mr, ref):
     for slot in REALIZATIONS.keys():
         # verbatim slot
         if not isinstance(REALIZATIONS[slot], dict):
-            matches.extend([Match(slot, match.group(0).lower(), match)
+            matches.extend([Match(slot, CAPITALIZE[slot][match.group(0).lower()], match)
                             for match in REALIZATIONS[slot].finditer(ref)])
         # slot with variable realizations
         else:
             # collect all matches for all values
             for value in REALIZATIONS[slot].keys():
-                matches.extend([Match(slot, value.lower(), match)
+                matches.extend([Match(slot, CAPITALIZE[slot][value.lower()], match)
                                 for match in REALIZATIONS[slot][value].finditer(ref)])
 
     # then filter out those that are substrings/duplicates (let only one value match,
@@ -294,25 +299,30 @@ def check_output(mr, ref):
         out_dict[match.slot] = out_dict.get(match.slot, {})
         out_dict[match.slot][match.value] = out_dict[match.slot].get(value, 0) + 1
 
+    return out_dict, mr_dict
+
+
+def check_output(gold_mr, out_mr):
+    """Check conformity of the given system output (ref) with the input MR. Assumes dict MR representation."""
     # count the errors in the output, looking at the MR
     added, missing, valerr, repeated = 0, 0, 0, 0
     diff = {}
-    for slot in set(mr_dict.keys()) | set(out_dict.keys()):
-        if slot in mr_dict and slot not in out_dict:
-            missing += sum(mr_dict[slot].values())
-            diff[slot] = {val: -count for val, count in mr_dict[slot].items()}
-        elif slot not in mr_dict and slot in out_dict:
-            added += sum(out_dict[slot].values())
-            diff[slot] = out_dict[slot]
+    for slot in set(gold_mr.keys()) | set(out_mr.keys()):
+        if slot in gold_mr and slot not in out_mr:
+            missing += sum(gold_mr[slot].values())
+            diff[slot] = {val: -count for val, count in gold_mr[slot].items()}
+        elif slot not in gold_mr and slot in out_mr:
+            added += sum(out_mr[slot].values())
+            diff[slot] = out_mr[slot]
         else:
             # remove repeated first (check if MR has same val less than out + same value more than 1x)
-            for val in out_dict[slot].keys():
-                if val in mr_dict[slot] and mr_dict[slot][val] < out_dict[slot][val]:
-                    repeated += out_dict[slot][val] - mr_dict[slot][val]
-                    out_dict[slot][val] = mr_dict[slot][val]
+            for val in out_mr[slot].keys():
+                if val in gold_mr[slot] and gold_mr[slot][val] < out_mr[slot][val]:
+                    repeated += out_mr[slot][val] - gold_mr[slot][val]
+                    out_mr[slot][val] = gold_mr[slot][val]
             # now compute the diff in the # of value occurrences
-            slot_diff = {val: mr_dict[slot].get(val, 0) - out_dict[slot].get(val, 0)
-                         for val in set(mr_dict[slot].keys()) | set(out_dict[slot].keys())}
+            slot_diff = {val: gold_mr[slot].get(val, 0) - out_mr[slot].get(val, 0)
+                         for val in set(gold_mr[slot].keys()) | set(out_mr[slot].keys())}
             diff[slot] = {val: -count for val, count in slot_diff.items() if count != 0}
             # diffs both ways
             mr_not_out = sum([count for count in slot_diff.values() if count > 0])
@@ -327,7 +337,7 @@ def check_output(mr, ref):
     return added, missing, valerr, repeated, diff
 
 
-def process_file(filename, dump=None, out=sys.stdout):
+def process_file(filename, dump=None, fix=None, out=sys.stdout):
     """Analyze a single file, optionally dump per-instance stats to a TSV.
     Will print to the `out` file provided (defaults to stdout)."""
     # read input from CSV or TSV
@@ -343,11 +353,13 @@ def process_file(filename, dump=None, out=sys.stdout):
     refs = list(df[ref_col])
 
     # count the statistics
-    added, missing, valerr, repeated, mr_len, diffs = [], [], [], [], [], []
+    added, missing, valerr, repeated, mr_len, diffs, fixed_mrs = [], [], [], [], [], [], []
     tot_ok, tot_m, tot_a, tot_ma = 0, 0, 0, 0
     for mr, ref in zip(mrs, refs):
-        # here's the main function where the texts are checked
-        inst_a, inst_m, inst_v, inst_r, diff = check_output(mr, ref)
+        # check the text (classify MR)
+        out_mr, gold_mr = reclassify_mr(ref, mr)
+        # build a MR diff
+        inst_a, inst_m, inst_v, inst_r, diff = check_output(gold_mr, out_mr)
         # just add the totals
         if (inst_a and inst_m) or inst_v:
             tot_ma += 1
@@ -363,6 +375,12 @@ def process_file(filename, dump=None, out=sys.stdout):
         repeated.append(inst_r)
         diffs.append(diff)
         mr_len.append(len(mr))
+        fixed_mr = DA.parse_dict(out_mr)
+        fixed_mr.dais.sort(key=lambda dai: ['name', 'eat_type', 'food', 'price_range', 'rating', 'area', 'family_friendly', 'near'].index(dai.slot))  # same order as diligent data
+        fixed_mr = re.sub(r'rating\[', r'customer rating[', fixed_mr.to_diligent_da_string())
+        fixed_mr = re.sub(r'_([a-z])', lambda match: match.group(1).upper(), fixed_mr)  # price_range -> priceRange
+        fixed_mrs.append(fixed_mr)
+
 
     # print the statistics
     print(filename, file=out)
@@ -375,6 +393,8 @@ def process_file(filename, dump=None, out=sys.stdout):
     print("InstMis: %5d / %5d = %.4f" % (tot_m,  len(refs), tot_m / float(len(refs))), file=out)
     print("InstM+A: %5d / %5d = %.4f" % (tot_ma,  len(refs), tot_ma / float(len(refs))), file=out)
 
+    print("Fixed MR String identical to original in %d cases." % sum(orig_mr == fixed_mr for orig_mr, fixed_mr in zip(raw_mrs, fixed_mrs)))
+
     # dump per-instance stats to TSV if needed
     if dump:
         df['added'] = added
@@ -383,8 +403,14 @@ def process_file(filename, dump=None, out=sys.stdout):
         df['repeated'] = repeated
         df['mr_len'] = mr_len
         df['diff'] = diffs
-        df.to_csv(dump, sep=b"\t", encoding='utf-8', index=False,
-                  columns=[mr_col, ref_col, 'added', 'missing', 'valerr', 'repeated', 'mr_len', 'diff'])
+        df['fixed_mr'] = fixed_mrs
+        df.to_csv(dump, sep=str("\t"), encoding='utf-8', index=False,
+                  columns=[mr_col, ref_col, 'added', 'missing', 'valerr', 'repeated', 'mr_len', 'diff', 'fixed_mr'])
+    if fix:
+        df[mr_col] = fixed_mrs
+        df['orig_mr'] = raw_mrs
+        df['fixed'] = [1 if fixed_mr != orig_mr else 0 for orig_mr, fixed_mr in zip(raw_mrs, fixed_mrs)]
+        df.to_csv(fix, encoding='utf-8', index=False, columns=[mr_col, ref_col, 'fixed', 'orig_mr'])
 
     # return the stats for CSV stat output if multiple files are processed
     return {'filename': filename,
@@ -404,11 +430,12 @@ def process_file(filename, dump=None, out=sys.stdout):
 if __name__ == '__main__':
     ap = ArgumentParser(description='Estimate semantic/slot error rate on E2E system outputs')
     ap.add_argument('--dump', '-d', type=str, help='Dump detailed output into a TSV file (one input only)')
+    ap.add_argument('--fix', '-f', type=str, help='Output a fixed CSV file (one input only)')
     ap.add_argument('input_files', nargs='+', type=str, help='Input TSV file(s)')
     args = ap.parse_args()
 
     if len(args.input_files) == 1:
-        process_file(args.input_files[0], args.dump)
+        process_file(args.input_files[0], args.dump, args.fix)
     else:
         results = []
         for filename in args.input_files:
