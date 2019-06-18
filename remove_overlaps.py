@@ -19,11 +19,13 @@ def main(args):
 
     test_orig_mrs = set([parse_mr(mr) for mr in list(test['orig_mr'])])
     test_mrs = set([parse_mr(mr) for mr in list(test['mr'])])
+    print("Test set distinct MR count: %d, originally %d" % (len(test_mrs), len(test_orig_mrs)))
 
     print("Checking devel set...")
 
     # check devel data:
     devel_idx_to_del = []
+    devel_orig_mrs = set([parse_mr(mr) for mr in list(devel['orig_mr'])])
     devel_mrs = set()
     avoid = test_mrs | test_orig_mrs
     for idx, inst in devel.iterrows():
@@ -40,11 +42,14 @@ def main(args):
     print("Writing fixed %s..." % output_devel)
     devel.to_csv(output_devel, encoding='UTF-8', index=False)
     print("%d instances, %d distinct (delexicalized) MRs." % (len(devel), len(devel_mrs - avoid)))
+    print("Original distinct MR count: %d" % len(devel_orig_mrs))
+
 
     print("Checking train set...")
 
     # check train data
     train_idx_to_del = []
+    train_orig_mrs = set([parse_mr(mr) for mr in list(train['orig_mr'])])
     train_mrs = set()
     avoid = devel_mrs | test_mrs | test_orig_mrs
     for idx, inst in train.iterrows():
@@ -61,6 +66,7 @@ def main(args):
     print("Writing fixed %s..." % output_train)
     train.to_csv(output_train, encoding='UTF-8', index=False)
     print("%d instances, %d distinct (delexicalized) MRs." % (len(train), len(train_mrs - avoid)))
+    print("Original distinct MR count: %d" % len(train_orig_mrs))
 
 
 

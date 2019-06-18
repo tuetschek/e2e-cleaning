@@ -376,7 +376,7 @@ def process_file(filename, dump=None, fix=None, out=sys.stdout):
         diffs.append(diff)
         mr_len.append(len(mr))
         fixed_mr = DA.parse_dict(out_mr)
-        fixed_mr.dais.sort(key=lambda dai: ['name', 'eat_type', 'food', 'price_range', 'rating', 'area', 'family_friendly', 'near'].index(dai.slot))  # same order as diligent data
+        fixed_mr.dais.sort(key=lambda dai: ['name', 'eat_type', 'food', 'price_range', 'rating', 'area', 'family_friendly', 'near'].index(dai.slot))  # same order as E2E NLG data
         fixed_mr = re.sub(r'rating\[', r'customer rating[', fixed_mr.to_diligent_da_string())
         fixed_mr = re.sub(r'_([a-z])', lambda match: match.group(1).upper(), fixed_mr)  # price_range -> priceRange
         fixed_mrs.append(fixed_mr)
