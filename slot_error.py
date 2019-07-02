@@ -341,20 +341,33 @@ def check_output(gold_mr, out_mr):
     return added, missing, valerr, repeated, diff
 
 
-def process_file(filename, dump=None, fix=None, out=sys.stdout):
+def load_lines(filename):
+    with codecs.open(filename, 'r', 'UTF-8') as fh:
+        lines = [line.strip() for line in fh.readlines()]
+    return lines
+
+
+def process_file(filename, dump=None, fix=None, fix_type='all', out=sys.stdout, mrs=None):
     """Analyze a single file, optionally dump per-instance stats to a TSV.
     Will print to the `out` file provided (defaults to stdout)."""
-    # read input from CSV or TSV
-    with codecs.open(filename, 'r', 'UTF-8') as fh:
-        line = fh.readline()
-        sep = "\t" if "\t" in line else ","
-    df = pd.read_csv(filename, sep=sep, encoding="UTF-8")
-    # accept column names used in the dataset itself and in system outputs
-    mr_col = 'MR' if 'MR' in df.columns else 'mr'
-    ref_col = 'output' if 'output' in df.columns else 'ref'
-    raw_mrs = list(df[mr_col])
-    mrs = [DA.parse_diligent_da(mr) for mr in raw_mrs]  # parse MRs
-    refs = list(df[ref_col])
+    if mrs:
+        raw_mrs = [mr.to_diligent_da_string() for mr in mrs]
+        refs = load_lines(filename)
+        mr_col = 'mr'
+        ref_col = 'ref'
+        df = pd.DataFrame({mr_col: raw_mrs, ref_col: refs})
+    else:
+        # read input from CSV or TSV
+        with codecs.open(filename, 'r', 'UTF-8') as fh:
+            line = fh.readline()
+            sep = "\t" if "\t" in line else ","
+        df = pd.read_csv(filename, sep=sep, encoding="UTF-8")
+        # accept column names used in the dataset itself and in system outputs
+        mr_col = 'MR' if 'MR' in df.columns else 'mr'
+        ref_col = 'output' if 'output' in df.columns else 'ref'
+        raw_mrs = list(df[mr_col])
+        mrs = [DA.parse_diligent_da(mr) for mr in raw_mrs]  # parse MRs
+        refs = list(df[ref_col])
 
     # count the statistics
     added, missing, valerr, repeated, mr_len, diffs, fixed_mrs = [], [], [], [], [], [], []
@@ -434,16 +447,20 @@ def process_file(filename, dump=None, fix=None, out=sys.stdout):
 if __name__ == '__main__':
     ap = ArgumentParser(description='Compute semantic error/fix annotation for E2E dataset')
     ap.add_argument('--dump', '-d', type=str, help='Dump detailed output into a TSV file (one input only)')
+    ap.add_argument('--mrs', '-m', type=str, help='Input MRs in a separate, TGen-formatted file (treat input files as TXT with one-per-line inputs)')
     ap.add_argument('--fix', '-f', type=str, help='Output a fixed CSV file (one input only)')
+    ap.add_argument('--fix-type', '--type', '-t', choices=['all', 'missing', 'added'], default='all', help='Types of errors to fix')
     ap.add_argument('input_files', nargs='+', type=str, help='Input TSV file(s)')
     args = ap.parse_args()
 
+    mrs = [DA.parse(line) for line in load_lines(args.mrs)] if args.mrs else None
+
     if len(args.input_files) == 1:
-        process_file(args.input_files[0], args.dump, args.fix)
+        process_file(args.input_files[0], args.dump, args.fix, args.fix_type, mrs=mrs)
     else:
         results = []
         for filename in args.input_files:
-            results.append(process_file(filename, out=sys.stderr))
+            results.append(process_file(filename, out=sys.stderr, mrs=mrs))
         results = pd.DataFrame.from_records(results)
         csv_out = results.to_csv(columns=['filename', 'total_insts', 'total_attr', 'semerr',
                                           'added', 'missing', 'valerr', 'repeated', 'inst_ok',
