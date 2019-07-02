@@ -14,8 +14,11 @@ def parse_mr(mr_text):
 def main(args):
 
     train = pd.read_csv(args.input_train, encoding="UTF-8")
+    train['mr'] = train['mr'].fillna('')
     devel = pd.read_csv(args.input_devel, encoding="UTF-8")
+    devel['mr'] = devel['mr'].fillna('')
     test = pd.read_csv(args.input_test, encoding="UTF-8")
+    test['mr'] = test['mr'].fillna('')
 
     test_orig_mrs = set([parse_mr(mr) for mr in list(test['orig_mr'])])
     test_mrs = set([parse_mr(mr) for mr in list(test['mr'])])
