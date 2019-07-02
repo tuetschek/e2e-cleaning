@@ -300,18 +300,24 @@ def reclassify_mr(ref, gold_mr=DA()):
     return out_dict, mr_dict
 
 
-def check_output(gold_mr, out_mr):
+def check_output(gold_mr, out_mr, fix_type='all'):
     """Check conformity of the given system output (ref) with the input MR. Assumes dict MR representation."""
     # count the errors in the output, looking at the MR
     added, missing, valerr, repeated = 0, 0, 0, 0
     diff = {}
     for slot in set(gold_mr.keys()) | set(out_mr.keys()):
         if slot in gold_mr and slot not in out_mr:
-            missing += sum(gold_mr[slot].values())
-            diff[slot] = {val: -count for val, count in gold_mr[slot].items()}
+            if fix_type != 'all' and 'missing' not in fix_type:  # ignore missing stuff -- adjust out_mr
+                out_mr[slot] = dict(gold_mr[slot])
+            else:
+                missing += sum(gold_mr[slot].values())
+                diff[slot] = {val: -count for val, count in gold_mr[slot].items()}
         elif slot not in gold_mr and slot in out_mr:
-            added += sum(out_mr[slot].values())
-            diff[slot] = out_mr[slot]
+            if fix_type != 'all' and 'added' not in fix_type:  # ignore added stuff -- adjust out_mr
+                del out_mr[slot]
+            else:
+                added += sum(out_mr[slot].values())
+                diff[slot] = out_mr[slot]
         else:
             # remove repeated first (check if MR has same val less than out + same value more than 1x)
             for val in out_mr[slot].keys():
@@ -321,6 +327,14 @@ def check_output(gold_mr, out_mr):
             # now compute the diff in the # of value occurrences
             slot_diff = {val: gold_mr[slot].get(val, 0) - out_mr[slot].get(val, 0)
                          for val in set(gold_mr[slot].keys()) | set(out_mr[slot].keys())}
+            if fix_type != 'all':
+                for val, val_diff in list(slot_diff.items()):
+                    if 'missing' not in fix_type and val_diff > 0:  # ignore missing stuff -- adjust out_mr
+                        out_mr[slot][val] = out_mr[slot].get(val, 0) + val_diff
+                        del slot_diff[val]
+                    if 'added' not in fix_type and val_diff < 0:  # ignore added stuff -- adjust out_mr
+                        out_mr[slot][val] = out_mr[slot].get(val, 0) - val_diff
+                        del slot_diff[val]
             diff[slot] = {val: -count for val, count in slot_diff.items() if count != 0}
             # diffs both ways
             mr_not_out = sum([count for count in slot_diff.values() if count > 0])
@@ -332,7 +346,7 @@ def check_output(gold_mr, out_mr):
             added += max(out_not_mr - mr_not_out, 0)
 
     diff = json.dumps({slot: vals for slot, vals in diff.items() if vals})
-    return added, missing, valerr, repeated, diff
+    return added, missing, valerr, repeated, diff, out_mr
 
 
 def load_lines(filename):
@@ -370,7 +384,7 @@ def process_file(filename, dump=None, fix=None, fix_type='all', out=sys.stdout, 
         # check the text (classify MR)
         out_mr, gold_mr = reclassify_mr(ref, mr)
         # build a MR diff
-        inst_a, inst_m, inst_v, inst_r, diff = check_output(gold_mr, out_mr)
+        inst_a, inst_m, inst_v, inst_r, diff, out_mr = check_output(gold_mr, out_mr, fix_type)
         # just add the totals
         if (inst_a and inst_m) or inst_v:
             tot_ma += 1
@@ -443,7 +457,8 @@ if __name__ == '__main__':
     ap.add_argument('--dump', '-d', type=str, help='Dump detailed output into a TSV file (one input only)')
     ap.add_argument('--mrs', '-m', type=str, help='Input MRs in a separate, TGen-formatted file (treat input files as TXT with one-per-line inputs)')
     ap.add_argument('--fix', '-f', type=str, help='Output a fixed CSV file (one input only)')
-    ap.add_argument('--fix-type', '--type', '-t', choices=['all', 'missing', 'added'], default='all', help='Types of errors to fix')
+    ap.add_argument('--fix-type', '--type', '-t',
+                    choices=['all', 'missing', 'added'], default='all', help='Types of errors to fix')
     ap.add_argument('input_files', nargs='+', type=str, help='Input TSV file(s)')
     args = ap.parse_args()
 
