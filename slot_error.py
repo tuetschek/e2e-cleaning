@@ -412,7 +412,10 @@ def process_file(filename, dump=None, fix=None, fix_type='all', out=sys.stdout, 
     print("A: %5d, M: %5d, V: %5d, R: %5d, L: %5d" %
           (sum(added), sum(missing), sum(valerr), sum(repeated), sum(mr_len)), file=out)
     semerr = (sum(added) + sum(missing) + sum(valerr) + sum(repeated)) / float(sum(mr_len))
-    print("SemERR = %.4f" % semerr, file=out)
+    insrate = sum(added) / float(sum(mr_len))
+    delrate = sum(missing) / float(sum(mr_len))
+    wvlrate = sum(valerr) / float(sum(mr_len))
+    print("SemERR = %.4f [InsRate = %.4f, DelRate = %.4f, WVlRate = %.4f]" % (semerr, insrate, delrate, wvlrate), file=out)
     print("InstOK : %5d / %5d = %.4f" % (tot_ok,  len(refs), tot_ok / float(len(refs))), file=out)
     print("InstAdd: %5d / %5d = %.4f" % (tot_a,  len(refs), tot_a / float(len(refs))), file=out)
     print("InstMis: %5d / %5d = %.4f" % (tot_m,  len(refs), tot_m / float(len(refs))), file=out)
