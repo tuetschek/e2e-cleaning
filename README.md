@@ -2,7 +2,8 @@
 Cleaning Semantic Noise in the E2E dataset
 ==========================================
 
-Accompanying release of data with cleaned MRs and scripts for the following paper (link coming soon):
+An update release of [E2E NLG Challenge data](http://www.macs.hw.ac.uk/InteractionLab/E2E/) with cleaned MRs and scripts, 
+accompanying the following paper (link coming soon):
 
 Ondřej Dušek, David M. Howcroft, and Verena Rieser (2019): Semantic Noise Matters for Neural Natural Language Generation. In _INLG_, Tokyo, Japan.
 
@@ -10,7 +11,7 @@ Ondřej Dušek, David M. Howcroft, and Verena Rieser (2019): Semantic Noise Matt
 Cleaned data
 ------------
 
-The fully cleaned data can be found in [cleaned-data](cleaned-data/). 
+The fully cleaned E2E NLG Challenge data can be found in [cleaned-data](cleaned-data/). 
 The training and development set are filtered so that they don't overlap the test set, hence the `no-ol` naming.
 
 The partially cleaned data (see paper) are under [partially-cleaned-data](partially-cleaned-data/).
