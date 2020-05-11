@@ -3,9 +3,9 @@ Cleaning Semantic Noise in the E2E dataset
 ==========================================
 
 An update release of [E2E NLG Challenge data](http://www.macs.hw.ac.uk/InteractionLab/E2E/) with cleaned MRs and scripts, 
-accompanying the following paper (link coming soon):
+accompanying the following paper:
 
-Ondřej Dušek, David M. Howcroft, and Verena Rieser (2019): Semantic Noise Matters for Neural Natural Language Generation. In _INLG_, Tokyo, Japan.
+Ondřej Dušek, David M. Howcroft, and Verena Rieser (2019): [Semantic Noise Matters for Neural Natural Language Generation](https://www.aclweb.org/anthology/W19-8652/). In _INLG_, Tokyo, Japan.
 
 
 Cleaned data
@@ -56,3 +56,15 @@ To use the slot error script as reranker ("TGen+"), we set `classif_filter` in t
 Note that a version of the `slot_error.py` script is 
 [included in TGen code](https://github.com/UFAL-DSG/tgen/blob/master/tgen/e2e/slot_error.py) 
 for simpler usage.
+
+
+System outputs
+--------------
+
+You can find system outputs of all versions of TGen trained and tested on original and cleaned data under [system-outputs](system-outputs/). These system outputs were used to obtain the top halves of Table 2 & 3 in the INLG paper.
+
+There are 3 different systems included:
+* _TGen-minus_ – TGen without any reranker
+* _TGen-std_ – TGen with the standard LSTM reranker trained on the same training data
+* _TGen-plus_ – TGen with the rule-based pattern matching reranker used to clean the data (“oracle”)
+All systems were run 5 times with different random network initialization (run0-run4).
