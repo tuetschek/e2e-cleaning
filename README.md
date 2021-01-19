@@ -63,7 +63,8 @@ System outputs
 
 You can find system outputs of all versions of TGen trained and tested on original and cleaned data under [system-outputs](system-outputs/). These system outputs were used to obtain the top halves of Table 2 & 3 in the INLG paper.
 
-There are 3 different systems included:
+There are 4 different systems included:
+* _SC-LSTM_ (Wen et al., 2015)
 * _TGen-minus_ – TGen without any reranker
 * _TGen-std_ – TGen with the standard LSTM reranker trained on the same training data
 * _TGen-plus_ – TGen with the rule-based pattern matching reranker used to clean the data (“oracle”)
